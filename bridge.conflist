@@ -1,0 +1,35 @@
+{
+  "cniVersion": "1.0.0",
+  "name": "cerverless",
+  "plugins": [
+    {
+      "type": "bridge",
+      "bridge": "cni0",
+      "isGateway": true,
+      "isDefaultGateway": true,
+      "forceAddress": false,
+     "ipMasq": true,
+      "promiscMode": true,
+      "mtu": 1500,
+      "ipam": {
+        "type": "host-local",
+        "ranges": [
+          [
+            {
+              "subnet": "10.22.0.0/24",
+              "gateway": "10.22.0.1"
+            }
+          ]
+        ]
+      }
+    },
+    {
+      "type": "firewall"
+    },
+    {
+      "type": "portmap",
+      "capabilities": {"portMappings": true},
+      "snat": true
+    }
+  ]
+}

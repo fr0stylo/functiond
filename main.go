@@ -34,7 +34,9 @@ func main() {
 	}
 	defer ws.Shutdown()
 
-	time.Sleep(10 * time.Second)
+	time.Sleep(5 * time.Second)
+	ws.Execute(context.Background(), []byte(fmt.Sprintf("Hello from the other side x %d time", 11)))
+	time.Sleep(20 * time.Second)
 }
 
 // func CreateSubscriber(ctx context.Context, stream jetstream.Stream, name string) jetstream.ConsumeContext {

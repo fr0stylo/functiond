@@ -30,6 +30,7 @@ func NewNode(client *containerd.Client, nm *NetworkManager, opts ...WorkerOpts) 
 	if err != nil {
 		return nil, err
 	}
+
 	return &Node{
 		WorkerOptions:  &options,
 		runtime:        NewRuntime(client, &options),

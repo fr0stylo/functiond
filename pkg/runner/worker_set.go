@@ -4,7 +4,6 @@ import (
 	"context"
 	"log"
 	"math/rand"
-	"sync"
 	"time"
 
 	containerd "github.com/containerd/containerd/v2/client"
@@ -14,17 +13,19 @@ import (
 )
 
 type WorkerSetOptions struct {
-	name        string
-	initCommand string
-	filePath    string
-	concurrency int
-	ports       []worker.PortMapping
+	name             string
+	initCommand      string
+	filePath         string
+	concurrency      int
+	downscaleTimeout time.Duration
+	ports            []worker.PortMapping
 }
 
 var defaultWSOptions = WorkerSetOptions{
-	name:        "nodejs",
-	filePath:    "",
-	concurrency: 5,
+	name:             "nodejs",
+	filePath:         "",
+	concurrency:      5,
+	downscaleTimeout: 10 * time.Second,
 }
 
 func WithWorkerSetName(name string) worker.Opts[WorkerSetOptions] {
@@ -38,6 +39,11 @@ func WithFile(filePath string) worker.Opts[WorkerSetOptions] {
 		opts.filePath = filePath
 	}
 }
+func WithDownscaleTimeout(duration time.Duration) worker.Opts[WorkerSetOptions] {
+	return func(opts *WorkerSetOptions) {
+		opts.downscaleTimeout = duration
+	}
+}
 
 type WorkerSet struct {
 	WorkerSetOptions
@@ -46,8 +52,12 @@ type WorkerSet struct {
 	networkManager *worker.NetworkManager
 	workers        chan worker.Worker
 	snapshotName   string
-	workerCount    int
-	lock           *sync.Mutex
+	downscaleMap   map[string]*time.Timer
+}
+
+func (r *WorkerSet) killWorker(node worker.Worker) {
+	delete(r.downscaleMap, node.Name())
+	node.Shutdown(r.ctx)
 }
 
 func (r *WorkerSet) Start() error {
@@ -55,26 +65,46 @@ func (r *WorkerSet) Start() error {
 		"RUNNING":       "example",
 		"IgnoreUnknown": "1",
 	}), worker.WithName(r.name+"-"+randSeq(4)), worker.WithSnapshot(r.snapshotName))
-	r.workerCount++
+
 	r.workers <- node
+	r.downscaleMap[node.Name()] = time.AfterFunc(r.downscaleTimeout, func() {
+		r.killWorker(node)
+	})
 	return node.Start(r.ctx)
 }
 
 func (r *WorkerSet) Execute(ctx context.Context, payload []byte) error {
-	if r.workerCount < r.WorkerSetOptions.concurrency && len(r.workers) == 0 {
-		if err := r.Start(); err != nil {
-			return err
-		}
+	w, err := r.retrieveWorker()
+	if err != nil {
+		return err
 	}
-	w := <-r.workers
+
 	go func() {
 		t := time.Now()
 		b, _ := w.Execute(ctx, payload)
 		log.Printf("[%s][%s] %s", w.Name(), time.Since(t), b)
-		defer func() { r.workers <- w }()
+		defer func() {
+			r.downscaleMap[w.Name()].Reset(r.downscaleTimeout)
+			r.workers <- w
+		}()
 	}()
 
 	return nil
+}
+
+func (r *WorkerSet) retrieveWorker() (worker.Worker, error) {
+	if len(r.downscaleMap) < r.WorkerSetOptions.concurrency && len(r.workers) == 0 {
+		if err := r.Start(); err != nil {
+			return nil, err
+		}
+
+	}
+	w := <-r.workers
+	if r.downscaleMap[w.Name()] == nil {
+		return r.retrieveWorker()
+	}
+
+	return w, nil
 }
 
 func (r *WorkerSet) Shutdown() {
@@ -82,7 +112,9 @@ func (r *WorkerSet) Shutdown() {
 	close(r.workers)
 
 	for w := range r.workers {
-		w.Shutdown(r.ctx)
+		if r.downscaleMap[w.Name()] != nil {
+			w.Shutdown(r.ctx)
+		}
 	}
 }
 
@@ -107,6 +139,9 @@ func NewWorkerSet(opts ...worker.Opts[WorkerSetOptions]) (*WorkerSet, error) {
 			options.name,
 			"final",
 			options.filePath)
+	if err != nil {
+		return nil, err
+	}
 
 	return &WorkerSet{
 		ctx:              ctx,
@@ -115,6 +150,7 @@ func NewWorkerSet(opts ...worker.Opts[WorkerSetOptions]) (*WorkerSet, error) {
 		WorkerSetOptions: options,
 		snapshotName:     snapshot,
 		workers:          make(chan worker.Worker, options.concurrency),
+		downscaleMap:     make(map[string]*time.Timer),
 	}, nil
 }
 

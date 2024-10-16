@@ -36,16 +36,16 @@ func (r *Snapshot) CreateSnapshot(ctx context.Context, imageName string, name st
 
 	image, err := r.client.Pull(ctx, imageName, containerd.WithPullUnpack)
 	if err != nil {
-		log.Fatalf("failed to pull image: %v", err)
 		return "", err
 	}
 
 	digests, err := image.RootFS(ctx)
-
+	if err != nil {
+		return "", err
+	}
 	imagefsid := identity.ChainID(digests).String()
 	mounts, err := snapshotService.Prepare(ctx, name, imagefsid)
 	if err != nil {
-		log.Fatalf("failed to prepare writable snapshot: %v", err)
 		return "", err
 	}
 

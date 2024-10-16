@@ -4,27 +4,27 @@ import (
 	"context"
 	"log"
 	"math/rand"
+	"sync"
 	"time"
 
 	containerd "github.com/containerd/containerd/v2/client"
-	"github.com/containerd/containerd/v2/pkg/namespaces"
 
 	"functiond/pkg/runner/worker"
 )
 
 type WorkerSetOptions struct {
 	name             string
-	initCommand      string
+	initCommand      []string
 	filePath         string
 	concurrency      int
 	downscaleTimeout time.Duration
-	ports            []worker.PortMapping
 }
 
 var defaultWSOptions = WorkerSetOptions{
 	name:             "nodejs",
+	initCommand:      []string{"node", "lambda/lambda.js"},
 	filePath:         "",
-	concurrency:      5,
+	concurrency:      110,
 	downscaleTimeout: 10 * time.Second,
 }
 
@@ -53,6 +53,7 @@ type WorkerSet struct {
 	workers        chan worker.Worker
 	snapshotName   string
 	downscaleMap   map[string]*time.Timer
+	lock           sync.Mutex
 }
 
 func (r *WorkerSet) killWorker(node worker.Worker) {
@@ -65,20 +66,22 @@ func (r *WorkerSet) Start() error {
 		"RUNNING":       "example",
 		"IgnoreUnknown": "1",
 	}), worker.WithName(r.name+"-"+randSeq(4)), worker.WithSnapshot(r.snapshotName))
-
+	if err := node.Start(r.ctx); err != nil {
+		return err
+	}
 	r.workers <- node
 	r.downscaleMap[node.Name()] = time.AfterFunc(r.downscaleTimeout, func() {
 		r.killWorker(node)
 	})
-	return node.Start(r.ctx)
+	return nil
 }
 
-func (r *WorkerSet) Execute(ctx context.Context, payload []byte) error {
+func (r *WorkerSet) Execute(ctx context.Context, payload []byte) (chan []byte, error) {
 	w, err := r.retrieveWorker()
 	if err != nil {
-		return err
+		return nil, err
 	}
-
+	res := make(chan []byte)
 	go func() {
 		t := time.Now()
 		b, _ := w.Execute(ctx, payload)
@@ -87,12 +90,15 @@ func (r *WorkerSet) Execute(ctx context.Context, payload []byte) error {
 			r.downscaleMap[w.Name()].Reset(r.downscaleTimeout)
 			r.workers <- w
 		}()
+		res <- b
 	}()
 
-	return nil
+	return res, nil
 }
 
 func (r *WorkerSet) retrieveWorker() (worker.Worker, error) {
+	r.lock.Lock()
+	defer r.lock.Unlock()
 	if len(r.downscaleMap) < r.WorkerSetOptions.concurrency && len(r.workers) == 0 {
 		if err := r.Start(); err != nil {
 			return nil, err
@@ -118,7 +124,7 @@ func (r *WorkerSet) Shutdown() {
 	}
 }
 
-func NewWorkerSet(opts ...worker.Opts[WorkerSetOptions]) (*WorkerSet, error) {
+func NewWorkerSet(ctx context.Context, opts ...worker.Opts[WorkerSetOptions]) (*WorkerSet, error) {
 	options := defaultWSOptions
 	for _, optFn := range opts {
 		optFn(&options)
@@ -132,7 +138,7 @@ func NewWorkerSet(opts ...worker.Opts[WorkerSetOptions]) (*WorkerSet, error) {
 	if err != nil {
 		return nil, err
 	}
-	ctx := namespaces.WithNamespace(context.Background(), "example")
+
 	snapshot, err := NewSnapshot(client).
 		CreateSnapshot(ctx,
 			"docker.io/library/node:lts-alpine",

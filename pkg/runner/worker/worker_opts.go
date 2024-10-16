@@ -6,23 +6,15 @@ type WorkerOpts = func(opts *WorkerOptions)
 type Opts[T any] func(opts *T)
 type WorkerOptions struct {
 	labels       map[string]string
-	portMapping  []gocni.PortMapping
 	snapshotName string
 	name         string
 }
 
 var defaultOptions = WorkerOptions{
-	labels:      map[string]string{},
-	portMapping: make([]gocni.PortMapping, 0),
+	labels: map[string]string{},
 }
 
 type PortMapping = gocni.PortMapping
-
-func WithPortMapping(pm []PortMapping) WorkerOpts {
-	return func(opts *WorkerOptions) {
-		opts.portMapping = pm
-	}
-}
 
 func WithLabels(labels map[string]string) WorkerOpts {
 	return func(opts *WorkerOptions) {

@@ -11,6 +11,7 @@ import (
 
 	containerd "github.com/containerd/containerd/v2/client"
 	"github.com/containerd/containerd/v2/core/mount"
+	"github.com/containerd/containerd/v2/core/snapshots"
 	"github.com/containerd/containerd/v2/defaults"
 	"github.com/opencontainers/image-spec/identity"
 	"golang.org/x/sys/unix"
@@ -26,13 +27,19 @@ func NewSnapshot(client *containerd.Client) *Snapshot {
 }
 
 func (r *Snapshot) CreateSnapshot(ctx context.Context, imageName string, name string, version string, zipPath string) (string, error) {
+	snapshotName := fmt.Sprintf("%s-%s", name, version)
+	snapshotService := r.client.SnapshotService(r.snapshotter)
+	_, err := snapshotService.Stat(ctx, snapshotName)
+	if err == nil {
+		return snapshotName, nil
+	}
+
 	image, err := r.client.Pull(ctx, imageName, containerd.WithPullUnpack)
 	if err != nil {
 		log.Fatalf("failed to pull image: %v", err)
 		return "", err
 	}
 
-	snapshotService := r.client.SnapshotService(r.snapshotter)
 	digests, err := image.RootFS(ctx)
 
 	imagefsid := identity.ChainID(digests).String()
@@ -45,12 +52,13 @@ func (r *Snapshot) CreateSnapshot(ctx context.Context, imageName string, name st
 	if err := unzipToSnapshot(mounts, zipPath); err != nil {
 		log.Fatalf("failed to copy file to snapshot: %v", err)
 	}
-	commitName := fmt.Sprintf("%s-%s", name, version)
-	if err := snapshotService.Commit(ctx, commitName, name); err != nil {
+	if err := snapshotService.Commit(ctx, snapshotName, name, snapshots.WithLabels(map[string]string{
+		"containerd.io/gc.root": "keep",
+	})); err != nil {
 		return "", err
 	}
 
-	return commitName, nil
+	return snapshotName, nil
 }
 
 func unzipToSnapshot(mounts []mount.Mount, source string) error {

@@ -1,4 +1,4 @@
-package runner
+package snapshotter
 
 import (
 	"archive/zip"

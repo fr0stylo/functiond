@@ -7,26 +7,22 @@ const SOCKET_PATH = '/etc/functiond/functiond.sock';
 
 function httpsGet({ ...options }) {
   return new Promise((resolve, reject) => {
-    const req = https.request(
-        {
-          method: 'GET',
-          ...options,
-        },
-        (res) => {
-          const chunks = [];
-          res.on('data', (data) => chunks.push(data));
-          res.on('end', () => {
-            let resBody = Buffer.concat(chunks);
-            switch (res.headers['content-type']) {
-              case 'application/json':
-                resBody = JSON.parse(resBody);
-                break;
-            }
-            console.log(resBody);
-            resolve(resBody);
-          });
-        },
-    );
+    const req = https.request({
+      method: 'GET', ...options,
+    }, (res) => {
+      const chunks = [];
+      res.on('data', (data) => chunks.push(data));
+      res.on('end', () => {
+        let resBody = Buffer.concat(chunks);
+        switch (res.headers['content-type']) {
+          case 'application/json':
+            resBody = JSON.parse(resBody);
+            break;
+        }
+        console.log(resBody);
+        resolve(resBody);
+      });
+    });
 
     req.on('error', reject);
     req.end();
@@ -45,9 +41,7 @@ async function client() {
     connection.on('error', (err) => {
       console.error(`${os.hostname} Socket error:`, err);
       if (err.code === 'ECONNREFUSED') {
-        console.error(
-            `${os.hostname} Connection refused. Make sure the server is running.`,
-        );
+        console.error(`${os.hostname} Connection refused. Make sure the server is running.`);
       }
       rej(err);
     });
@@ -56,10 +50,9 @@ async function client() {
       console.log(`${os.hostname} Received from server:`, data.toString());
 
       const res = await httpsGet({
-        hostname: 'ifconfig.me',
-        path: '/all.json',
+        hostname: 'ifconfig.me', path: '/all.json',
       });
-      await setTimeout(Math.random() * 100);
+
       connection.write(JSON.stringify(res));
       connection.end();
       connection.destroy();

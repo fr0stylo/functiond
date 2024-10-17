@@ -9,6 +9,7 @@ import (
 
 	containerd "github.com/containerd/containerd/v2/client"
 
+	"functiond/pkg/runner/snapshotter"
 	"functiond/pkg/runner/worker"
 )
 
@@ -54,6 +55,10 @@ type WorkerSet struct {
 	snapshotName   string
 	downscaleMap   map[string]*time.Timer
 	lock           sync.Mutex
+}
+
+func (r *WorkerSet) Name() string {
+	return r.name
 }
 
 func (r *WorkerSet) killWorker(node worker.Worker) {
@@ -139,7 +144,7 @@ func NewWorkerSet(ctx context.Context, opts ...worker.Opts[WorkerSetOptions]) (*
 		return nil, err
 	}
 
-	snapshot, err := NewSnapshot(client).
+	snapshot, err := snapshotter.NewSnapshot(client).
 		CreateSnapshot(ctx,
 			"docker.io/library/node:lts-alpine",
 			options.name,

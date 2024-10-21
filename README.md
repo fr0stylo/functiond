@@ -13,6 +13,16 @@ scalable way to run serverless functions in isolated containers with automatic s
 - HTTP API for function execution
 - Automatic instance cleanup and resource management
 
+## TODO
+
+- [x] Downscale function cleanup
+- [] Register new version
+- [] Create function url with several functions
+- [] Enable multi host environment
+- [] Enable tenanting
+- [] Enable versioning for lambdas to be able to rollback and move further
+- [] Create environment level setup for several environments with deploy propagation
+
 ## Prerequisites
 
 - Go 1.20 or later

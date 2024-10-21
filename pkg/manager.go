@@ -4,21 +4,20 @@ import (
 	"context"
 
 	"functiond/pkg/runner"
-	"functiond/pkg/runner/worker"
 )
 
-type Manager struct {
+type WorkerSetManager struct {
 	workerSets map[string]*runner.WorkerSet
 }
 
-func NewManager() *Manager {
-	return &Manager{
+func NewManager() *WorkerSetManager {
+	return &WorkerSetManager{
 		workerSets: map[string]*runner.WorkerSet{},
 	}
 }
 
-func (r *Manager) Register(ctx context.Context, opts ...worker.Opts[runner.WorkerSetOptions]) error {
-	ws, err := runner.NewWorkerSet(ctx, opts...)
+func (r *WorkerSetManager) Register(ctx context.Context, opts *runner.WorkerSetOptions) error {
+	ws, err := runner.NewWorkerSet(ctx, runner.WithOptions(opts))
 	if err != nil {
 		return err
 	}
@@ -27,20 +26,20 @@ func (r *Manager) Register(ctx context.Context, opts ...worker.Opts[runner.Worke
 	return nil
 }
 
-func (r *Manager) RegisterVersion() {
+func (r *WorkerSetManager) RegisterVersion() {
 
 }
 
-func (r *Manager) RetrieveWorker(name string) *runner.WorkerSet {
+func (r *WorkerSetManager) RetrieveWorker(name string) *runner.WorkerSet {
 	return r.workerSets[name]
 }
 
-func (r *Manager) Deregister(name string) {
+func (r *WorkerSetManager) Deregister(name string) {
 	r.workerSets[name].Shutdown()
 	delete(r.workerSets, name)
 }
 
-func (r *Manager) Close() {
+func (r *WorkerSetManager) Close() {
 	for k := range r.workerSets {
 		r.Deregister(k)
 	}

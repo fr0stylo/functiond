@@ -60,16 +60,19 @@ func (r *Node) Shutdown(ctx context.Context) error {
 }
 
 func (r *Node) Start(ctx context.Context) error {
+	log.Print("starting")
 	socket := r.socket.Start()
-
+	log.Print(socket)
 	if err := r.runtime.Start(ctx, socket); err != nil {
 		return err
 	}
+	log.Print("runtime")
 
 	pid, err := r.runtime.GetPid()
 	if err != nil {
 		return err
 	}
+	log.Print("runtime pid", pid)
 
 	return r.networkManager.Attach(ctx, pid, r.labels)
 }

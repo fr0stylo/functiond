@@ -6,10 +6,12 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"time"
 
 	containerd "github.com/containerd/containerd/v2/client"
 	"github.com/containerd/containerd/v2/pkg/namespaces"
 
+	"functiond/pkg"
 	"functiond/pkg/runner"
 )
 
@@ -19,24 +21,26 @@ func main() {
 	cleanup()
 	ctx := namespaces.WithNamespace(context.Background(), "example")
 
-	ws, err := runner.NewWorkerSet(
-		ctx,
+	wsm := pkg.NewManager()
+	if err := wsm.Register(ctx, runner.BuildOptions(
 		runner.WithWorkerSetName("node-server"),
-		runner.WithFile("./lambda.zip"))
-	if err != nil {
+		runner.WithFile("./lambda.zip"),
+		runner.WithDownscaleTimeout(5*time.Second),
+	)); err != nil {
 		log.Fatal(err)
 	}
 
-	defer ws.Shutdown()
+	defer wsm.Close()
 
 	mux := http.NewServeMux()
 
-	mux.HandleFunc("/execute", func(writer http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("/{id}/execute", func(writer http.ResponseWriter, r *http.Request) {
 		defer r.Body.Close()
-		if r.Method != http.MethodGet {
+		if r.Method != http.MethodPost {
 			http.Error(writer, "Method not allowed", http.StatusMethodNotAllowed)
 			return
 		}
+
 		//val := map[string]any{}
 		//if err := json.NewDecoder(r.Body).Decode(&val); err != nil {
 		//	log.Print(err)
@@ -45,7 +49,14 @@ func main() {
 		//}
 		//b, _ := json.Marshal(val)
 
-		res, err := ws.Execute(r.Context(), make([]byte, 1, 2))
+		name := r.PathValue("id")
+		w := wsm.RetrieveWorker(name)
+		if w == nil {
+			http.NotFound(writer, r)
+			return
+		}
+		log.Printf("%+v", w)
+		res, err := w.Execute(r.Context(), make([]byte, 1, 2))
 		if err != nil {
 			log.Print(err)
 			http.Error(writer, "Failed to execute", http.StatusBadRequest)

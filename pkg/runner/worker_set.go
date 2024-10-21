@@ -14,19 +14,24 @@ import (
 )
 
 type WorkerSetOptions struct {
-	name             string
-	initCommand      []string
-	filePath         string
-	concurrency      int
-	downscaleTimeout time.Duration
+	runtime              string
+	name                 string
+	environmentVariables map[string]string
+	filePath             string
+	initCommand          []string
+	memoryLimit          int
+	cpuLimit             int
+	concurrency          int
+	downscaleTimeout     time.Duration
 }
 
 var defaultWSOptions = WorkerSetOptions{
-	name:             "nodejs",
-	initCommand:      []string{"node", "lambda/lambda.js"},
-	filePath:         "",
-	concurrency:      110,
-	downscaleTimeout: 10 * time.Second,
+	name:                 "nodejs",
+	initCommand:          []string{"node", "lambda.js"},
+	environmentVariables: map[string]string{},
+	filePath:             "",
+	concurrency:          110,
+	downscaleTimeout:     10 * time.Second,
 }
 
 func WithWorkerSetName(name string) worker.Opts[WorkerSetOptions] {
@@ -35,19 +40,35 @@ func WithWorkerSetName(name string) worker.Opts[WorkerSetOptions] {
 	}
 }
 
+func WithOptions(options *WorkerSetOptions) worker.Opts[WorkerSetOptions] {
+	return func(opts *WorkerSetOptions) {
+		*opts = *options
+	}
+}
+
 func WithFile(filePath string) worker.Opts[WorkerSetOptions] {
 	return func(opts *WorkerSetOptions) {
 		opts.filePath = filePath
 	}
 }
+
 func WithDownscaleTimeout(duration time.Duration) worker.Opts[WorkerSetOptions] {
 	return func(opts *WorkerSetOptions) {
 		opts.downscaleTimeout = duration
 	}
 }
 
+func BuildOptions(opts ...worker.Opts[WorkerSetOptions]) *WorkerSetOptions {
+	options := defaultWSOptions
+	for _, optFn := range opts {
+		optFn(&options)
+	}
+
+	return &options
+}
+
 type WorkerSet struct {
-	WorkerSetOptions
+	*WorkerSetOptions
 	ctx            context.Context
 	client         *containerd.Client
 	networkManager *worker.NetworkManager
@@ -64,6 +85,13 @@ func (r *WorkerSet) Name() string {
 func (r *WorkerSet) killWorker(node worker.Worker) {
 	delete(r.downscaleMap, node.Name())
 	node.Shutdown(r.ctx)
+	for {
+		w := <-r.workers
+		if w.Name() == node.Name() {
+			return
+		}
+		r.workers <- w
+	}
 }
 
 func (r *WorkerSet) Start() error {
@@ -130,10 +158,7 @@ func (r *WorkerSet) Shutdown() {
 }
 
 func NewWorkerSet(ctx context.Context, opts ...worker.Opts[WorkerSetOptions]) (*WorkerSet, error) {
-	options := defaultWSOptions
-	for _, optFn := range opts {
-		optFn(&options)
-	}
+	options := BuildOptions(opts...)
 
 	client, err := containerd.New("/run/containerd/containerd.sock")
 	if err != nil {

@@ -44,7 +44,7 @@ func (r *Node) Name() string {
 }
 
 func (r *Node) Execute(ctx context.Context, payload []byte) ([]byte, error) {
-	return r.socket.Execute(payload), nil
+	return r.socket.Execute(ctx, payload)
 }
 
 func (r *Node) Shutdown(ctx context.Context) error {

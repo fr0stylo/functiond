@@ -19,6 +19,7 @@ type WorkerSetOptions struct {
 	environmentVariables map[string]string
 	filePath             string
 	initCommand          []string
+	execTimeout          int
 	memoryLimit          int
 	cpuLimit             int
 	concurrency          int
@@ -29,6 +30,7 @@ var defaultWSOptions = WorkerSetOptions{
 	name:                 "nodejs",
 	initCommand:          []string{"node", "lambda.js"},
 	environmentVariables: map[string]string{},
+	execTimeout:          5,
 	filePath:             "",
 	concurrency:          110,
 	downscaleTimeout:     10 * time.Second,
@@ -83,6 +85,7 @@ func (r *WorkerSet) Name() string {
 }
 
 func (r *WorkerSet) killWorker(node worker.Worker) {
+	r.downscaleMap[node.Name()].Stop()
 	delete(r.downscaleMap, node.Name())
 	node.Shutdown(r.ctx)
 	for {
@@ -109,21 +112,36 @@ func (r *WorkerSet) Start() error {
 	return nil
 }
 
-func (r *WorkerSet) Execute(ctx context.Context, payload []byte) (chan []byte, error) {
+type ExecResult struct {
+	Err    error
+	Result []byte
+}
+
+func (r *WorkerSet) Execute(ctx context.Context, payload []byte) (chan *ExecResult, error) {
+	res := make(chan *ExecResult)
 	w, err := r.retrieveWorker()
 	if err != nil {
 		return nil, err
 	}
-	res := make(chan []byte)
 	go func() {
+		timeoutCtx, cancel := context.WithTimeout(ctx, time.Duration(r.execTimeout)*time.Second)
+		defer cancel()
+
 		t := time.Now()
-		b, _ := w.Execute(ctx, payload)
+		b, err := w.Execute(timeoutCtx, payload)
+		if err != nil {
+			log.Printf("[%s] timeout period elapsed %s", w.Name(), time.Since(t))
+			res <- &ExecResult{Err: err}
+			go r.killWorker(w)
+			return
+		}
+
 		log.Printf("[%s][%s] %s", w.Name(), time.Since(t), b)
 		defer func() {
 			r.downscaleMap[w.Name()].Reset(r.downscaleTimeout)
 			r.workers <- w
 		}()
-		res <- b
+		res <- &ExecResult{Result: b}
 	}()
 
 	return res, nil

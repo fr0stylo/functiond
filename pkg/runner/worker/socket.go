@@ -2,11 +2,16 @@ package worker
 
 import (
 	"bytes"
+	"context"
+	"errors"
 	"fmt"
 	"io"
 	"log"
 	"net"
-	"os"
+)
+
+var (
+	Err_Timeout = errors.New("timeout")
 )
 
 type SocketHandler struct {
@@ -14,6 +19,7 @@ type SocketHandler struct {
 	path      string
 	message   chan []byte
 	onMessage chan []byte
+	cancel    chan struct{}
 }
 
 func NewSocketHandler(name string) (*SocketHandler, error) {
@@ -34,35 +40,45 @@ func NewSocketHandler(name string) (*SocketHandler, error) {
 
 func (r *SocketHandler) Start() string {
 	go func() {
-
 		for {
-			con, err := r.socket.AcceptUnix()
-			if err != nil {
-				log.Fatal(err)
-			}
-			body := <-r.message
-
-			con.Write(body)
-			buff := make([]byte, 0)
-			b := bytes.NewBuffer(buff)
-			if _, err := io.Copy(b, con); err != nil {
-				log.Print(err)
-			}
-
-			r.onMessage <- b.Bytes()
-			con.Close()
+			r.handleConnection()
 		}
 	}()
 
 	return r.path
 }
 
-func (r *SocketHandler) Execute(payload []byte) []byte {
+func (r *SocketHandler) handleConnection() {
+	r.cancel = make(chan struct{})
+
+	con, err := r.socket.AcceptUnix()
+	if err != nil {
+		log.Print(err)
+		return
+	}
+	defer con.Close()
+	body := <-r.message
+	con.Write(body)
+	buff := make([]byte, 0)
+	b := bytes.NewBuffer(buff)
+	if _, err := io.Copy(b, con); err != nil {
+		log.Print(err)
+		return
+	}
+	r.onMessage <- b.Bytes()
+}
+
+func (r *SocketHandler) Execute(ctx context.Context, payload []byte) ([]byte, error) {
 	r.message <- payload
-	return <-r.onMessage
+
+	select {
+	case msg := <-r.onMessage:
+		return msg, nil
+	case <-ctx.Done():
+		return nil, Err_Timeout
+	}
 }
 
 func (r *SocketHandler) Close() {
 	r.socket.Close()
-	os.ReadFile(r.path)
 }

@@ -63,8 +63,14 @@ func main() {
 			return
 		}
 
+		execResult := <-res
+		if execResult.Err != nil {
+			http.Error(writer, execResult.Err.Error(), http.StatusBadRequest)
+			return
+		}
+
 		writer.WriteHeader(200)
-		writer.Write(<-res)
+		writer.Write(execResult.Result)
 	})
 
 	http.ListenAndServe(":8080", mux)

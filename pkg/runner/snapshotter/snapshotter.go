@@ -67,7 +67,7 @@ func unzipToSnapshot(mounts []mount.Mount, source string) error {
 	}
 	defer mount.Unmount("/mnt", unix.MNT_DETACH)
 	path := "/opt/function"
-	if err := os.MkdirAll("/mnt"+path, 700); err != nil {
+	if err := os.MkdirAll("/mnt"+path, 0700); err != nil {
 		return err
 	}
 	reader, err := zip.OpenReader(source)

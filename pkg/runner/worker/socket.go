@@ -25,7 +25,7 @@ type SocketHandler struct {
 func NewSocketHandler(name string) (*SocketHandler, error) {
 	socketPath := fmt.Sprintf("/etc/functiond/%s.sock", name)
 
-	l, err := net.ListenUnix("unix", &net.UnixAddr{socketPath, "unix"})
+	l, err := net.ListenUnix("unix", &net.UnixAddr{Name: socketPath, Net: "unix"})
 	if err != nil {
 		return nil, err
 	}

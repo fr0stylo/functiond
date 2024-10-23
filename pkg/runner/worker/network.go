@@ -8,6 +8,46 @@ import (
 	gocni "github.com/containerd/go-cni"
 )
 
+const conflist = `{
+  "cniVersion": "1.0.0",
+  "name": "functiond",
+  "plugins": [
+    {
+      "type": "bridge",
+      "bridge": "cni0",
+      "isGateway": true,
+      "isDefaultGateway": true,
+      "forceAddress": false,
+     "ipMasq": true,
+      "promiscMode": true,
+      "mtu": 1500,
+      "ipam": {
+        "type": "host-local",
+        "ranges": [
+          [
+            {
+              "subnet": "10.22.0.0/24",
+              "gateway": "10.22.0.1"
+            }
+          ]
+        ]
+      },
+      "dns": {
+	"nameservers": ["10.22.0.1", "8.8.8.8"]
+	}
+    },
+    {
+      "type": "firewall"
+    },
+    {
+      "type": "portmap",
+      "capabilities": {"portMappings": true},
+      "snat": true
+    }
+  ]
+}
+`
+
 type NetworkManager struct {
 	cni       gocni.CNI
 	netNSBase string
@@ -19,7 +59,7 @@ func NewNetworkManager() (*NetworkManager, error) {
 		gocni.WithPluginConfDir("/etc/cni/net.d"),
 		gocni.WithPluginDir([]string{"/opt/cni/bin"}),
 		gocni.WithInterfacePrefix("eth"),
-		gocni.WithConfListFile("/etc/cni/net.d/10-functiond.conflist"))
+		gocni.WithConfListBytes([]byte(conflist)))
 	if err != nil {
 		return nil, err
 	}

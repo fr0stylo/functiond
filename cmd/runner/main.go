@@ -99,7 +99,7 @@ func main() {
 // 	})
 // 	if err != nil {
 // 		log.Fatal(err)
-// 	}
+// 	}10-functiond.conflist
 // 	return cc
 // }
 
@@ -126,4 +126,8 @@ func cleanup() {
 	}
 
 	fmt.Println("Cleanup completed successfully")
+}
+
+func prepareCNI(ctx context.Context) {
+	
 }

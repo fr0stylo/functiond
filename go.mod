@@ -1,12 +1,12 @@
 module functiond
 
-go 1.23.0
+go 1.27
 
 require (
 	github.com/containerd/containerd/v2 v2.0.0-rc.5
 	github.com/containerd/go-cni v1.1.10
-	github.com/nats-io/nats.go v1.37.0
 	github.com/opencontainers/image-spec v1.1.0
+	github.com/opencontainers/runtime-spec v1.2.0
 	golang.org/x/sys v0.25.0
 )
 
@@ -41,10 +41,7 @@ require (
 	github.com/moby/sys/signal v0.7.1 // indirect
 	github.com/moby/sys/user v0.3.0 // indirect
 	github.com/moby/sys/userns v0.1.0 // indirect
-	github.com/nats-io/nkeys v0.4.7 // indirect
-	github.com/nats-io/nuid v1.0.1 // indirect
 	github.com/opencontainers/go-digest v1.0.0 // indirect
-	github.com/opencontainers/runtime-spec v1.2.0 // indirect
 	github.com/opencontainers/runtime-tools v0.9.1-0.20221107090550-2e043c6bd626 // indirect
 	github.com/opencontainers/selinux v1.11.0 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
@@ -55,7 +52,6 @@ require (
 	go.opentelemetry.io/otel v1.30.0 // indirect
 	go.opentelemetry.io/otel/metric v1.30.0 // indirect
 	go.opentelemetry.io/otel/trace v1.30.0 // indirect
-	golang.org/x/crypto v0.27.0 // indirect
 	golang.org/x/mod v0.21.0 // indirect
 	golang.org/x/net v0.29.0 // indirect
 	golang.org/x/sync v0.8.0 // indirect

@@ -1,6 +1,9 @@
 package orchestration
 
-import "time"
+import (
+	"functiond/pkg/orchestration/pool"
+	"time"
+)
 
 type WorkerOpts interface{}
 
@@ -11,6 +14,7 @@ type WorkerSetOptions struct {
 	concurrency      int
 	downscaleTimeout time.Duration
 	workerOpts       WorkerOpts
+	workerFactory    pool.PoolFactory[Worker]
 }
 
 var defaultWSOptions = WorkerSetOptions{
@@ -34,6 +38,7 @@ func DefaultOptions(opts *WorkerSetOptions) {
 	opts.memoryLimit = 256
 	opts.downscaleTimeout = 1 * time.Minute
 	opts.execTimeout = 5 * time.Second
+	opts.workerFactory = nil
 	opts.workerOpts = nil
 }
 
@@ -64,5 +69,11 @@ func WithTimeout(i time.Duration) func(opts *WorkerSetOptions) {
 func WithDownscaleTimeout(i time.Duration) func(opts *WorkerSetOptions) {
 	return func(opts *WorkerSetOptions) {
 		opts.downscaleTimeout = i
+	}
+}
+
+func WithWorkerFactory(i WorkerFactory) func(opts *WorkerSetOptions) {
+	return func(opts *WorkerSetOptions) {
+		opts.workerFactory = i
 	}
 }

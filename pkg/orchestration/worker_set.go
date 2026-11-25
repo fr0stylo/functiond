@@ -2,7 +2,9 @@ package orchestration
 
 import (
 	"context"
-	"math/rand"
+	"functiond/pkg/orchestration/pool"
+	"log"
+	"time"
 )
 
 type Worker interface {
@@ -13,6 +15,8 @@ type Worker interface {
 	Stop(ctx context.Context) error
 }
 
+type WorkerFactory pool.PoolFactory[Worker]
+
 type ExecResult struct {
 	Err    error
 	Result []byte
@@ -22,97 +26,48 @@ type WorkerSet struct {
 	name string
 	ctx  context.Context
 	opts *WorkerSetOptions
+	pool *pool.Pool[Worker]
 }
 
 func (r *WorkerSet) Name() string {
 	return r.name
 }
 
-func (r *WorkerSet) killWorker(node Worker) {
-	// r.downscaleMap[node.Name()].Stop()
-	// delete(r.downscaleMap, node.Name())
-	// node.Shutdown(r.ctx)
-	// for {
-	// 	w := <-r.workers
-	// 	if w.Name() == node.Name() {
-	// 		return
-	// 	}
-	// 	r.workers <- w
-	// }
-}
-
 func (r *WorkerSet) Start() error {
-	// node, _ := worker.NewNode(r.client, r.networkManager, worker.WithLabels(map[string]string{
-	// 	"RUNNING":       "example",
-	// 	"IgnoreUnknown": "1",
-	// }), worker.WithName(r.name+"-"+randSeq(4)), worker.WithSnapshot(r.snapshotName))
-	// if err := node.Start(r.ctx); err != nil {
-	// 	return err
-	// }
-	// r.workers <- node
-	// r.downscaleMap[node.Name()] = time.AfterFunc(r.downscaleTimeout, func() {
-	// 	r.killWorker(node)
-	// })
-
 	return nil
 }
 
 func (r *WorkerSet) Execute(ctx context.Context, payload []byte) (chan *ExecResult, error) {
-	// res := make(chan *ExecResult)
-	// w, err := r.retrieveWorker()
-	// if err != nil {
-	// 	return nil, err
-	// }
-	// go func() {
-	// 	timeoutCtx, cancel := context.WithTimeout(ctx, time.Duration(r.execTimeout)*time.Second)
-	// 	defer cancel()
+	res := make(chan *ExecResult)
+	l, err := r.pool.Aquire()
+	if err != nil {
+		return nil, err
+	}
+	go func() {
+		timeoutCtx, cancel := context.WithTimeout(ctx, r.opts.execTimeout)
+		defer cancel()
 
-	// 	t := time.Now()
-	// 	b, err := w.Execute(timeoutCtx, payload)
-	// 	if err != nil {
-	// 		log.Printf("[%s] timeout period elapsed %s", w.Name(), time.Since(t))
-	// 		res <- &ExecResult{Err: err}
-	// 		go r.killWorker(w)
-	// 		return
-	// 	}
+		t := time.Now()
+		b, err := l.Value().Execute(timeoutCtx, payload)
+		if err != nil {
+			log.Printf("[%s] timeout period elapsed %s", l.Key(), time.Since(t))
+			res <- &ExecResult{Err: err}
+			go l.Destroy(ctx)
+			return
+		}
 
-	// 	log.Printf("[%s][%s] %s", w.Name(), time.Since(t), b)
-	// 	defer func() {
-	// 		r.downscaleMap[w.Name()].Reset(r.downscaleTimeout)
-	// 		r.workers <- w
-	// 	}()
-	// 	res <- &ExecResult{Result: b}
-	// }()
+		log.Printf("[%s][%s] %s", l.Key(), time.Since(t), b)
+		defer func() {
+			l.Release()
+		}()
+		res <- b
+	}()
 
-	// return res, nil
-	return nil, nil
+	return res, nil
 }
 
-func (r *WorkerSet) retrieveWorker() (Worker, error) {
-	// r.lock.Lock()
-	// defer r.lock.Unlock()
-	// if len(r.downscaleMap) < r.WorkerSetOptions.concurrency && len(r.workers) == 0 {
-	// 	if err := r.Start(); err != nil {
-	// 		return nil, err
-	// 	}
-
-	// }
-	// w := <-r.workers
-	// if r.downscaleMap[w.Name()] == nil {
-	// 	return r.retrieveWorker()
-	// }
-
-	return nil, nil
-}
-
-func (r *WorkerSet) Shutdown() {
-	// close(r.workers)
-
-	// for w := range r.workers {
-	// 	if r.downscaleMap[w.Name()] != nil {
-	// 		w.Shutdown(r.ctx)
-	// 	}
-	// }
+func (r *WorkerSet) Shutdown(ctx context.Context) error {
+	return r.pool.Close(ctx)
 }
 
 func NewWorkerSet(ctx context.Context, opts ...Opts[WorkerSetOptions]) (*WorkerSet, error) {
@@ -126,15 +81,10 @@ func NewWorkerSet(ctx context.Context, opts ...Opts[WorkerSetOptions]) (*WorkerS
 	return &WorkerSet{
 		ctx:  ctx,
 		opts: options,
+		pool: pool.NewPool(
+			options.concurrency,
+			options.workerFactory,
+			options.downscaleTimeout,
+		),
 	}, nil
-}
-
-var letters = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
-
-func randSeq(n int) string {
-	b := make([]rune, n)
-	for i := range b {
-		b[i] = letters[rand.Intn(len(letters))]
-	}
-	return string(b)
 }

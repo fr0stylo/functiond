@@ -2,78 +2,51 @@ package main
 
 import (
 	"context"
-	"fmt"
-	"log"
-	"net/http"
+	"functiond/pkg/orchestration"
+	"functiond/pkg/runtime/shell"
+	"log/slog"
 	"os"
+	"sync"
 	"time"
-
-	containerd "github.com/containerd/containerd/v2/client"
-	"github.com/containerd/containerd/v2/pkg/namespaces"
-
-	"functiond/pkg"
-	"functiond/pkg/runner"
 )
 
 func main() {
-	log.SetOutput(os.Stdout)
-	os.MkdirAll("/etc/functiond", 0777)
-	cleanup()
-	ctx := namespaces.WithNamespace(context.Background(), "example")
+	m := orchestration.NewManager()
+	ws, err := orchestration.NewWorkerSet(
+		context.Background(),
+		orchestration.WithConcurency(50),
+		orchestration.WithWorkerFactory(shell.NewFactory()),
+	)
 
-	wsm := pkg.NewManager()
-	if err := wsm.Register(ctx, runner.BuildOptions(
-		runner.WithWorkerSetName("node-server"),
-		runner.WithFile("./lambda.zip"),
-		runner.WithDownscaleTimeout(5*time.Second),
-	)); err != nil {
-		log.Fatal(err)
+	if err != nil {
+		slog.Error("Error while creating WS", "error", err)
+		os.Exit(1)
 	}
 
-	defer wsm.Close()
+	m.Register(context.Background(), "test",
+		ws,
+	)
 
-	mux := http.NewServeMux()
+	var wg sync.WaitGroup
+	for i := 0; i < 10; i++ {
+		wg.Go(func() {
+			w := m.RetrieveWorker("test")
+			if err != nil {
+				slog.Error("Error while creating WS", "error", err)
+				os.Exit(1)
+			}
+			r, err := w.Execute(context.Background(), []byte("sleep $(( RANDOM % 10 + 1 )) && date"))
+			if err != nil {
+				slog.Error("Error while calling execute", "error", err)
+				os.Exit(1)
+			}
+			<-r
+		})
+	}
 
-	mux.HandleFunc("/{id}/execute", func(writer http.ResponseWriter, r *http.Request) {
-		defer r.Body.Close()
-		if r.Method != http.MethodPost {
-			http.Error(writer, "Method not allowed", http.StatusMethodNotAllowed)
-			return
-		}
+	wg.Wait()
 
-		//val := map[string]any{}
-		//if err := json.NewDecoder(r.Body).Decode(&val); err != nil {
-		//	log.Print(err)
-		//	http.Error(writer, "Failed to parse json", http.StatusBadRequest)
-		//	return
-		//}
-		//b, _ := json.Marshal(val)
-
-		name := r.PathValue("id")
-		w := wsm.RetrieveWorker(name)
-		if w == nil {
-			http.NotFound(writer, r)
-			return
-		}
-		log.Printf("%+v", w)
-		res, err := w.Execute(r.Context(), make([]byte, 1, 2))
-		if err != nil {
-			log.Print(err)
-			http.Error(writer, "Failed to execute", http.StatusBadRequest)
-			return
-		}
-
-		execResult := <-res
-		if execResult.Err != nil {
-			http.Error(writer, execResult.Err.Error(), http.StatusBadRequest)
-			return
-		}
-
-		writer.WriteHeader(200)
-		writer.Write(execResult.Result)
-	})
-
-	http.ListenAndServe(":8080", mux)
+	time.Sleep(30 * time.Second)
 }
 
 //	time.Sleep(5 * time.Second)
@@ -102,32 +75,3 @@ func main() {
 // 	}10-functiond.conflist
 // 	return cc
 // }
-
-func cleanup() {
-	client, _ := containerd.New("/run/containerd/containerd.sock")
-	defer client.Close()
-	ctx := namespaces.WithNamespace(context.Background(), "example")
-
-	cl, _ := client.Containers(ctx)
-	for _, container := range cl {
-		if task, err := container.Task(ctx, nil); err == nil {
-			if _, err := task.Delete(ctx, containerd.WithProcessKill); err != nil {
-				fmt.Printf("Failed to delete task for container %s: %v\n", container.ID(), err)
-			} else {
-				fmt.Printf("Deleted task for container: %s\n", container.ID())
-			}
-		}
-
-		if err := container.Delete(ctx, containerd.WithSnapshotCleanup); err != nil {
-			fmt.Printf("Failed to delete container %s: %v\n", container.ID(), err)
-		} else {
-			fmt.Printf("Deleted container: %s\n", container.ID())
-		}
-	}
-
-	fmt.Println("Cleanup completed successfully")
-}
-
-func prepareCNI(ctx context.Context) {
-	
-}

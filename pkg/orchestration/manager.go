@@ -7,7 +7,7 @@ import (
 
 type WorkersSet interface {
 	Executor
-	Shutdown()
+	Shutdown(context.Context) error
 }
 
 type Executor interface {
@@ -39,13 +39,13 @@ func (r *WorkerSetManager) RetrieveWorker(name string) Executor {
 func (r *WorkerSetManager) Deregister(name string) {
 	w, ok := r.w.LoadAndDelete(name)
 	if ok {
-		w.(WorkersSet).Shutdown()
+		w.(WorkersSet).Shutdown(context.TODO())
 	}
 }
 
 func (r *WorkerSetManager) Close() {
 	r.w.Range(func(key, value any) bool {
-		value.(WorkersSet).Shutdown()
+		value.(WorkersSet).Shutdown(context.TODO())
 		return true
 	})
 	r.w.Clear()

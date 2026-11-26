@@ -39,14 +39,17 @@ func (r *Lease[V]) Destroy(ctx context.Context) error {
 		return ErrorLeaseExpired
 	}
 	delete(r.pool.container, r.resource.name)
+	el := r.resource.val
+	r.resource = nil
+	r.pool.m.Unlock()
+
+	err := el.Stop(ctx)
+
+	r.pool.m.Lock()
 	r.pool.notify.Notify()
 	r.pool.m.Unlock()
 
-	el := r.resource.val
-	el.Stop(ctx)
-	r.resource = nil
-
-	return nil
+	return err
 }
 
 func (r *Lease[V]) Value() (V, error) {

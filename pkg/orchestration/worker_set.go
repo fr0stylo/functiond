@@ -9,8 +9,6 @@ import (
 
 type Worker interface {
 	Name() string
-	Init(ctx context.Context) error
-	Start(ctx context.Context) error
 	Execute(ctx context.Context, payload []byte) (*ExecResult, error)
 	Stop(ctx context.Context) error
 }

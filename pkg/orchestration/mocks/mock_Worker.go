@@ -81,52 +81,6 @@ func (_c *MockWorker_Execute_Call) RunAndReturn(run func(context.Context, []byte
 	return _c
 }
 
-// Init provides a mock function with given fields: ctx
-func (_m *MockWorker) Init(ctx context.Context) error {
-	ret := _m.Called(ctx)
-
-	if len(ret) == 0 {
-		panic("no return value specified for Init")
-	}
-
-	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context) error); ok {
-		r0 = rf(ctx)
-	} else {
-		r0 = ret.Error(0)
-	}
-
-	return r0
-}
-
-// MockWorker_Init_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'Init'
-type MockWorker_Init_Call struct {
-	*mock.Call
-}
-
-// Init is a helper method to define mock.On call
-//   - ctx context.Context
-func (_e *MockWorker_Expecter) Init(ctx interface{}) *MockWorker_Init_Call {
-	return &MockWorker_Init_Call{Call: _e.mock.On("Init", ctx)}
-}
-
-func (_c *MockWorker_Init_Call) Run(run func(ctx context.Context)) *MockWorker_Init_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context))
-	})
-	return _c
-}
-
-func (_c *MockWorker_Init_Call) Return(_a0 error) *MockWorker_Init_Call {
-	_c.Call.Return(_a0)
-	return _c
-}
-
-func (_c *MockWorker_Init_Call) RunAndReturn(run func(context.Context) error) *MockWorker_Init_Call {
-	_c.Call.Return(run)
-	return _c
-}
-
 // Name provides a mock function with no fields
 func (_m *MockWorker) Name() string {
 	ret := _m.Called()
@@ -168,52 +122,6 @@ func (_c *MockWorker_Name_Call) Return(_a0 string) *MockWorker_Name_Call {
 }
 
 func (_c *MockWorker_Name_Call) RunAndReturn(run func() string) *MockWorker_Name_Call {
-	_c.Call.Return(run)
-	return _c
-}
-
-// Start provides a mock function with given fields: ctx
-func (_m *MockWorker) Start(ctx context.Context) error {
-	ret := _m.Called(ctx)
-
-	if len(ret) == 0 {
-		panic("no return value specified for Start")
-	}
-
-	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context) error); ok {
-		r0 = rf(ctx)
-	} else {
-		r0 = ret.Error(0)
-	}
-
-	return r0
-}
-
-// MockWorker_Start_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'Start'
-type MockWorker_Start_Call struct {
-	*mock.Call
-}
-
-// Start is a helper method to define mock.On call
-//   - ctx context.Context
-func (_e *MockWorker_Expecter) Start(ctx interface{}) *MockWorker_Start_Call {
-	return &MockWorker_Start_Call{Call: _e.mock.On("Start", ctx)}
-}
-
-func (_c *MockWorker_Start_Call) Run(run func(ctx context.Context)) *MockWorker_Start_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context))
-	})
-	return _c
-}
-
-func (_c *MockWorker_Start_Call) Return(_a0 error) *MockWorker_Start_Call {
-	_c.Call.Return(_a0)
-	return _c
-}
-
-func (_c *MockWorker_Start_Call) RunAndReturn(run func(context.Context) error) *MockWorker_Start_Call {
 	_c.Call.Return(run)
 	return _c
 }

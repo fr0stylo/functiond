@@ -37,38 +37,31 @@ func (r *WorkerSet) Start() error {
 	return nil
 }
 
-func (r *WorkerSet) Execute(ctx context.Context, payload []byte) (chan *ExecResult, error) {
-	res := make(chan *ExecResult)
-	l, err := r.pool.Aquire()
+func (r *WorkerSet) Execute(ctx context.Context, payload []byte) (*ExecResult, error) {
+	l, err := r.pool.Aquire(ctx)
 	if err != nil {
 		return nil, err
 	}
-	go func() {
-		timeoutCtx, cancel := context.WithTimeout(ctx, r.opts.execTimeout)
-		defer cancel()
+	timeoutCtx, cancel := context.WithTimeout(ctx, r.opts.execTimeout)
+	defer cancel()
 
-		t := time.Now()
-		b, err := l.Value()
-		if err != nil {
-			return
-		}
-		key, _ := l.Key()
-		resp, err := b.Execute(timeoutCtx, payload)
-		if err != nil {
-			log.Printf("[%s] timeout period elapsed %s", key, time.Since(t))
-			res <- &ExecResult{Err: err}
-			go l.Destroy(ctx)
-			return
-		}
+	t := time.Now()
+	b, err := l.Value()
+	if err != nil {
+		return &ExecResult{Err: err}, err
+	}
+	key, _ := l.Key()
+	resp, err := b.Execute(timeoutCtx, payload)
+	if err != nil {
+		log.Printf("[%s] timeout period elapsed %s", key, time.Since(t))
+		go l.Destroy(ctx)
+		return &ExecResult{Err: err}, err
+	}
 
-		log.Printf("[%s][%s] %s", key, time.Since(t), resp)
-		defer func() {
-			l.Release()
-		}()
-		res <- resp
-	}()
+	log.Printf("[%s][%s] %s", key, time.Since(t), resp)
+	defer l.Release()
 
-	return res, nil
+	return resp, nil
 }
 
 func (r *WorkerSet) Shutdown(ctx context.Context) error {

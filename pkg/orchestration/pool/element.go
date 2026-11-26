@@ -22,9 +22,9 @@ func NewElement[V Stopable](v V) *Element[V] {
 	}
 }
 
-func NewElementFromFactory[V Stopable](v PoolFactory[V]) (*Element[V], error) {
+func NewElementFromFactory[V Stopable](ctx context.Context, v PoolFactory[V]) (*Element[V], error) {
 	name := utils.RandStringN(16)
-	e, err := v.Create(context.Background(), name)
+	e, err := v.Create(ctx, name)
 	if err != nil {
 		return nil, err
 	}

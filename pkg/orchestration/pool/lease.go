@@ -25,7 +25,7 @@ func (r *Lease[V]) Release() error {
 
 	r.resource.refCount -= 1
 	r.pool.idleQueue.PushBack(r.resource)
-	r.pool.s.Signal()
+	r.pool.notify.Notify()
 	r.resource = nil
 
 	return nil
@@ -37,11 +37,11 @@ func (r *Lease[V]) Destroy(ctx context.Context) error {
 	}
 	r.pool.m.Lock()
 	delete(r.pool.container, r.resource.name)
+	r.pool.notify.Notify()
 	r.pool.m.Unlock()
 
 	el := r.resource.val
 	el.Stop(ctx)
-	r.pool.s.Signal()
 	r.resource = nil
 
 	return nil

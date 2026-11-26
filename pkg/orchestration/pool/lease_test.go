@@ -25,7 +25,7 @@ func TestLeaseValueAndKey(t *testing.T) {
 	want := &leaseResource{}
 	require.NoError(t, p.Add(want))
 
-	lease, err := p.Aquire()
+	lease, err := p.Aquire(t.Context())
 	require.NoError(t, err)
 	require.NotNil(t, lease)
 
@@ -42,7 +42,7 @@ func TestLeaseReleaseReturnsResourceToPool(t *testing.T) {
 	want := &leaseResource{}
 	require.NoError(t, p.Add(want))
 
-	lease, err := p.Aquire()
+	lease, err := p.Aquire(t.Context())
 	require.NoError(t, err)
 	require.NotNil(t, lease)
 	require.NoError(t, lease.Release())
@@ -56,7 +56,7 @@ func TestLeaseReleaseReturnsResourceToPool(t *testing.T) {
 	assert.Empty(t, key)
 
 	assert.Equal(t, 1, p.IdleSize())
-	reused, err := p.Aquire()
+	reused, err := p.Aquire(t.Context())
 	require.NoError(t, err)
 	require.NotNil(t, reused)
 	value, err = reused.Value()
@@ -69,7 +69,7 @@ func TestLeaseDestroyStopsResource(t *testing.T) {
 	resource := &leaseResource{}
 	require.NoError(t, p.Add(resource))
 
-	lease, err := p.Aquire()
+	lease, err := p.Aquire(t.Context())
 	require.NoError(t, err)
 	require.NotNil(t, lease)
 	require.NoError(t, lease.Destroy(t.Context()))

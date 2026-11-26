@@ -35,12 +35,11 @@ func main() {
 				slog.Error("Error while creating WS", "error", err)
 				os.Exit(1)
 			}
-			r, err := w.Execute(context.Background(), []byte("sleep $(( RANDOM % 10 + 1 )) && date"))
+			_, err := w.Execute(context.Background(), []byte("sleep $(( RANDOM % 10 + 1 )) && date"))
 			if err != nil {
 				slog.Error("Error while calling execute", "error", err)
 				os.Exit(1)
 			}
-			<-r
 		})
 	}
 

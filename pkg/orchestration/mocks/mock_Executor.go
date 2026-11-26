@@ -23,23 +23,23 @@ func (_m *MockExecutor) EXPECT() *MockExecutor_Expecter {
 }
 
 // Execute provides a mock function with given fields: ctx, body
-func (_m *MockExecutor) Execute(ctx context.Context, body []byte) (chan *orchestration.ExecResult, error) {
+func (_m *MockExecutor) Execute(ctx context.Context, body []byte) (*orchestration.ExecResult, error) {
 	ret := _m.Called(ctx, body)
 
 	if len(ret) == 0 {
 		panic("no return value specified for Execute")
 	}
 
-	var r0 chan *orchestration.ExecResult
+	var r0 *orchestration.ExecResult
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, []byte) (chan *orchestration.ExecResult, error)); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, []byte) (*orchestration.ExecResult, error)); ok {
 		return rf(ctx, body)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, []byte) chan *orchestration.ExecResult); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, []byte) *orchestration.ExecResult); ok {
 		r0 = rf(ctx, body)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(chan *orchestration.ExecResult)
+			r0 = ret.Get(0).(*orchestration.ExecResult)
 		}
 	}
 
@@ -71,12 +71,12 @@ func (_c *MockExecutor_Execute_Call) Run(run func(ctx context.Context, body []by
 	return _c
 }
 
-func (_c *MockExecutor_Execute_Call) Return(_a0 chan *orchestration.ExecResult, _a1 error) *MockExecutor_Execute_Call {
+func (_c *MockExecutor_Execute_Call) Return(_a0 *orchestration.ExecResult, _a1 error) *MockExecutor_Execute_Call {
 	_c.Call.Return(_a0, _a1)
 	return _c
 }
 
-func (_c *MockExecutor_Execute_Call) RunAndReturn(run func(context.Context, []byte) (chan *orchestration.ExecResult, error)) *MockExecutor_Execute_Call {
+func (_c *MockExecutor_Execute_Call) RunAndReturn(run func(context.Context, []byte) (*orchestration.ExecResult, error)) *MockExecutor_Execute_Call {
 	_c.Call.Return(run)
 	return _c
 }

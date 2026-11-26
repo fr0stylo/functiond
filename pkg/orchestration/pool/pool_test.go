@@ -28,10 +28,10 @@ func (e *Element) Stop(ctx context.Context) error {
 func TestPool(t *testing.T) {
 	first := &Element{data: "one"}
 	factory := mocks.NewMockPoolFactory[*Element](t)
-	factory.EXPECT().Create(context.Background(), mock.Anything).Return(first, nil).Once()
+	factory.EXPECT().Create(t.Context(), mock.Anything).Return(first, nil).Once()
 	p := pool.NewPool(3, factory, 5*time.Second)
 
-	created, err := p.Aquire()
+	created, err := p.Aquire(t.Context())
 	require.NoError(t, err)
 	require.NotNil(t, created)
 	createdValue, err := created.Value()
@@ -44,13 +44,13 @@ func TestPool(t *testing.T) {
 	require.NoError(t, p.Add(&Element{data: "two"}))
 	require.NoError(t, p.Add(&Element{data: "three"}))
 
-	l1, err := p.Aquire()
+	l1, err := p.Aquire(t.Context())
 	require.NoError(t, err)
 	require.NotNil(t, l1)
-	l2, err := p.Aquire()
+	l2, err := p.Aquire(t.Context())
 	require.NoError(t, err)
 	require.NotNil(t, l2)
-	l3, err := p.Aquire()
+	l3, err := p.Aquire(t.Context())
 	require.NoError(t, err)
 	require.NotNil(t, l3)
 	assert.Zero(t, p.IdleSize())
@@ -71,7 +71,7 @@ func TestPool(t *testing.T) {
 
 	require.NoError(t, l2.Release())
 	assert.Equal(t, 1, p.IdleSize())
-	l2, err = p.Aquire()
+	l2, err = p.Aquire(t.Context())
 	require.NoError(t, err)
 	require.NotNil(t, l2)
 	assert.Zero(t, p.IdleSize())
@@ -94,7 +94,7 @@ func TestPoolReleaseMakesResourceAvailableAgain(t *testing.T) {
 		p := pool.NewPool[*Element](1, nil, 5*time.Second)
 		want := &Element{data: "reusable"}
 		require.NoError(t, p.Add(want))
-		first, err := p.Aquire()
+		first, err := p.Aquire(t.Context())
 		require.NoError(t, err)
 		require.NotNil(t, first)
 		firstValue, err := first.Value()
@@ -107,7 +107,7 @@ func TestPoolReleaseMakesResourceAvailableAgain(t *testing.T) {
 		var acquireErr error
 		acquired := false
 		go func() {
-			second, acquireErr = p.Aquire()
+			second, acquireErr = p.Aquire(t.Context())
 			acquired = true
 		}()
 		synctest.Wait()
@@ -130,12 +130,59 @@ func TestPoolReleaseMakesResourceAvailableAgain(t *testing.T) {
 	})
 }
 
+func TestPoolAddWakesWaitingAcquire(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		p := pool.NewPool[*Element](1, nil, 5*time.Second)
+		ctx, cancel := context.WithCancel(t.Context())
+		defer cancel()
+
+		var lease *pool.Lease[*Element]
+		var acquireErr error
+		go func() {
+			lease, acquireErr = p.Aquire(ctx)
+		}()
+		synctest.Wait()
+		require.Nil(t, lease)
+
+		want := &Element{data: "added"}
+		require.NoError(t, p.Add(want))
+		synctest.Wait()
+		require.NoError(t, acquireErr)
+		require.NotNil(t, lease)
+		value, err := lease.Value()
+		require.NoError(t, err)
+		assert.Same(t, want, value)
+		require.NoError(t, lease.Release())
+	})
+}
+
+func TestPoolWaitingAcquireReturnsOnCancellation(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		p := pool.NewPool[*Element](1, nil, 5*time.Second)
+		ctx, cancel := context.WithCancel(t.Context())
+		defer cancel()
+
+		var lease *pool.Lease[*Element]
+		var acquireErr error
+		go func() {
+			lease, acquireErr = p.Aquire(ctx)
+		}()
+		synctest.Wait()
+		require.NoError(t, acquireErr)
+
+		cancel()
+		synctest.Wait()
+		require.ErrorIs(t, acquireErr, context.Canceled)
+		require.Nil(t, lease)
+	})
+}
+
 func TestPoolDestroyRemovesResourceAndStopsIt(t *testing.T) {
 	p := pool.NewPool[*Element](1, nil, 5*time.Second)
 	resource := &Element{data: "temporary"}
 	assert.NoError(t, p.Add(resource))
 
-	lease, err := p.Aquire()
+	lease, err := p.Aquire(t.Context())
 	assert.NoError(t, err)
 	if !assert.NotNil(t, lease) {
 		return
@@ -156,17 +203,17 @@ func TestPoolDestroyLetsWaitingAcquireCreateReplacement(t *testing.T) {
 		resource := &Element{data: "temporary"}
 		replacement := &Element{data: "replacement"}
 		factory := mocks.NewMockPoolFactory[*Element](t)
-		factory.EXPECT().Create(context.Background(), mock.Anything).Return(replacement, nil).Once()
+		factory.EXPECT().Create(t.Context(), mock.Anything).Return(replacement, nil).Once()
 		p := pool.NewPool(1, factory, 5*time.Second)
 		require.NoError(t, p.Add(resource))
-		first, err := p.Aquire()
+		first, err := p.Aquire(t.Context())
 		require.NoError(t, err)
 		require.NotNil(t, first)
 
 		var second *pool.Lease[*Element]
 		var acquireErr error
 		go func() {
-			second, acquireErr = p.Aquire()
+			second, acquireErr = p.Aquire(t.Context())
 		}()
 		synctest.Wait()
 		require.NoError(t, first.Destroy(t.Context()))

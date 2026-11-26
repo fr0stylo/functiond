@@ -11,7 +11,7 @@ type WorkersSet interface {
 }
 
 type Executor interface {
-	Execute(ctx context.Context, body []byte) (chan *ExecResult, error)
+	Execute(ctx context.Context, body []byte) (*ExecResult, error)
 }
 
 type WorkerSetManager struct {

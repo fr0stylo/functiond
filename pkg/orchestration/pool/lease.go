@@ -16,12 +16,12 @@ type Lease[V Stopable] struct {
 }
 
 func (r *Lease[V]) Release() error {
+	r.pool.m.Lock()
+	defer r.pool.m.Unlock()
+
 	if r.resource == nil {
 		return ErrorLeaseExpired
 	}
-
-	r.pool.m.Lock()
-	defer r.pool.m.Unlock()
 
 	r.resource.refCount -= 1
 	r.pool.idleQueue.PushBack(r.resource)
@@ -32,10 +32,10 @@ func (r *Lease[V]) Release() error {
 }
 
 func (r *Lease[V]) Destroy(ctx context.Context) error {
+	r.pool.m.Lock()
 	if r.resource == nil {
 		return ErrorLeaseExpired
 	}
-	r.pool.m.Lock()
 	delete(r.pool.container, r.resource.name)
 	r.pool.notify.Notify()
 	r.pool.m.Unlock()

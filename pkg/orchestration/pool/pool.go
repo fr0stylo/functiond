@@ -91,13 +91,11 @@ func (r *Pool[V]) Aquire(ctx context.Context) (*Lease[V], error) {
 			defer r.m.Unlock()
 			return r.formLease(e.Value.(*Element[V])), nil
 		}
-		notify := r.notify.Wait()
 
 		if r.factory != nil && len(r.container)+r.creating < r.maxSize {
 			r.creating++
 			r.m.Unlock()
 			e, err := NewElementFromFactory(ctx, r.factory)
-
 			r.m.Lock()
 			r.creating--
 			defer r.m.Unlock()
@@ -107,6 +105,8 @@ func (r *Pool[V]) Aquire(ctx context.Context) (*Lease[V], error) {
 			}
 			return r.formLease(e), nil
 		}
+
+		notify := r.notify.Wait()
 		r.m.Unlock()
 
 		select {

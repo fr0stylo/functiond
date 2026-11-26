@@ -35,6 +35,7 @@ func (r *Lease[V]) Release() error {
 func (r *Lease[V]) Destroy(ctx context.Context) error {
 	r.pool.m.Lock()
 	if r.resource == nil {
+		defer r.pool.m.Unlock()
 		return ErrorLeaseExpired
 	}
 	delete(r.pool.container, r.resource.name)

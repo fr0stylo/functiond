@@ -90,6 +90,7 @@ func (r *Pool[V]) Aquire(ctx context.Context) (*Lease[V], error) {
 			defer r.m.Unlock()
 			return r.formLease(e.Value.(*Element[V])), nil
 		}
+		notify := r.notify.Wait()
 		r.m.Unlock()
 
 		if r.factory != nil && len(r.container) < r.maxSize {
@@ -105,7 +106,7 @@ func (r *Pool[V]) Aquire(ctx context.Context) (*Lease[V], error) {
 
 		select {
 		case <-ctx.Done():
-		case <-r.notify.Wait():
+		case <-notify:
 		}
 	}
 }

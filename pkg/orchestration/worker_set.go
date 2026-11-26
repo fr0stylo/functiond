@@ -48,19 +48,24 @@ func (r *WorkerSet) Execute(ctx context.Context, payload []byte) (chan *ExecResu
 		defer cancel()
 
 		t := time.Now()
-		b, err := l.Value().Execute(timeoutCtx, payload)
+		b, err := l.Value()
 		if err != nil {
-			log.Printf("[%s] timeout period elapsed %s", l.Key(), time.Since(t))
+			return
+		}
+		key, _ := l.Key()
+		resp, err := b.Execute(timeoutCtx, payload)
+		if err != nil {
+			log.Printf("[%s] timeout period elapsed %s", key, time.Since(t))
 			res <- &ExecResult{Err: err}
 			go l.Destroy(ctx)
 			return
 		}
 
-		log.Printf("[%s][%s] %s", l.Key(), time.Since(t), b)
+		log.Printf("[%s][%s] %s", key, time.Since(t), resp)
 		defer func() {
 			l.Release()
 		}()
-		res <- b
+		res <- resp
 	}()
 
 	return res, nil

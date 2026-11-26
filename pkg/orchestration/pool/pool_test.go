@@ -34,10 +34,12 @@ func TestPool(t *testing.T) {
 	created, err := p.Aquire()
 	require.NoError(t, err)
 	require.NotNil(t, created)
-	assert.Same(t, first, created.Value())
+	createdValue, err := created.Value()
+	require.NoError(t, err)
+	assert.Same(t, first, createdValue)
 	assert.Equal(t, 1, p.Size())
 	assert.Zero(t, p.IdleSize())
-	created.Release()
+	require.NoError(t, created.Release())
 
 	require.NoError(t, p.Add(&Element{data: "two"}))
 	require.NoError(t, p.Add(&Element{data: "three"}))
@@ -53,22 +55,35 @@ func TestPool(t *testing.T) {
 	require.NotNil(t, l3)
 	assert.Zero(t, p.IdleSize())
 	assert.Equal(t, 3, p.Size())
-	assert.Equal(t, "one", l1.Value().data)
-	assert.Equal(t, "two", l2.Value().data)
-	assert.Equal(t, "three", l3.Value().data)
+	for _, check := range []struct {
+		lease *pool.Lease[*Element]
+		want  string
+	}{
+		{l1, "one"},
+		{l2, "two"},
+		{l3, "three"},
+	} {
+		value, err := check.lease.Value()
+		require.NoError(t, err)
+		require.NotNil(t, value)
+		assert.Equal(t, check.want, value.data)
+	}
 
-	l2.Release()
+	require.NoError(t, l2.Release())
 	assert.Equal(t, 1, p.IdleSize())
 	l2, err = p.Aquire()
 	require.NoError(t, err)
 	require.NotNil(t, l2)
 	assert.Zero(t, p.IdleSize())
-	assert.Equal(t, "two", l2.Value().data)
+	reused, err := l2.Value()
+	require.NoError(t, err)
+	require.NotNil(t, reused)
+	assert.Equal(t, "two", reused.data)
 
-	l3.Release()
-	l1.Release()
+	require.NoError(t, l3.Release())
+	require.NoError(t, l1.Release())
 	assert.Equal(t, 2, p.IdleSize())
-	l2.Release()
+	require.NoError(t, l2.Release())
 	assert.Equal(t, 3, p.IdleSize())
 
 	assert.Error(t, p.Add(&Element{data: "four"}))
@@ -82,7 +97,11 @@ func TestPoolReleaseMakesResourceAvailableAgain(t *testing.T) {
 		first, err := p.Aquire()
 		require.NoError(t, err)
 		require.NotNil(t, first)
-		assert.Same(t, want, first.Value())
+		firstValue, err := first.Value()
+		require.NoError(t, err)
+		assert.Same(t, want, firstValue)
+		firstKey, err := first.Key()
+		require.NoError(t, err)
 
 		var second *pool.Lease[*Element]
 		var acquireErr error
@@ -94,14 +113,18 @@ func TestPoolReleaseMakesResourceAvailableAgain(t *testing.T) {
 		synctest.Wait()
 		assert.False(t, acquired, "acquire should wait while the only resource is leased")
 
-		first.Release()
+		require.NoError(t, first.Release())
 		synctest.Wait()
 		require.True(t, acquired, "release should wake the waiting acquire")
 		require.NoError(t, acquireErr)
 		require.NotNil(t, second)
-		assert.Same(t, want, second.Value())
-		assert.Equal(t, first.Key(), second.Key())
-		second.Release()
+		secondValue, err := second.Value()
+		require.NoError(t, err)
+		assert.Same(t, want, secondValue)
+		secondKey, err := second.Key()
+		require.NoError(t, err)
+		assert.Equal(t, firstKey, secondKey)
+		require.NoError(t, second.Release())
 		assert.Equal(t, 1, p.Size())
 		assert.Equal(t, 1, p.IdleSize())
 	})
@@ -117,7 +140,7 @@ func TestPoolDestroyRemovesResourceAndStopsIt(t *testing.T) {
 	if !assert.NotNil(t, lease) {
 		return
 	}
-	lease.Destroy(context.Background())
+	require.NoError(t, lease.Destroy(context.Background()))
 
 	assert.Equal(t, 0, p.Size())
 	assert.Equal(t, 0, p.IdleSize())
@@ -146,14 +169,16 @@ func TestPoolDestroyLetsWaitingAcquireCreateReplacement(t *testing.T) {
 			second, acquireErr = p.Aquire()
 		}()
 		synctest.Wait()
-		first.Destroy(t.Context())
+		require.NoError(t, first.Destroy(t.Context()))
 		synctest.Wait()
 
 		require.NoError(t, acquireErr)
 		require.NotNil(t, second, "destroy should let the waiting acquire create a replacement")
-		assert.Same(t, replacement, second.Value())
+		value, err := second.Value()
+		require.NoError(t, err)
+		assert.Same(t, replacement, value)
 		assert.Equal(t, 1, resource.stopCalls)
 		assert.Equal(t, 1, p.Size())
-		second.Release()
+		require.NoError(t, second.Release())
 	})
 }

@@ -24,6 +24,7 @@ func (r *Lease[V]) Release() error {
 	}
 
 	r.resource.refCount -= 1
+	r.resource.Touch()
 	r.pool.idleQueue.PushBack(r.resource)
 	r.pool.notify.Notify()
 	r.resource = nil

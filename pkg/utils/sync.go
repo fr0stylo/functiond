@@ -6,7 +6,7 @@ type Notifier struct {
 
 func NewNotifier() *Notifier {
 	return &Notifier{
-		n: make(chan struct{}),
+		n: make(chan struct{}, 1),
 	}
 }
 
@@ -23,5 +23,5 @@ func (r *Notifier) Signal() {
 
 func (r *Notifier) Notify() {
 	close(r.n)
-	r.n = make(chan struct{})
+	r.n = make(chan struct{}, 1)
 }

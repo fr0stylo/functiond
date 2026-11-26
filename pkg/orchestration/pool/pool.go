@@ -98,7 +98,7 @@ func (r *Pool[V]) Aquire(ctx context.Context) (*Lease[V], error) {
 			r.m.Lock()
 			defer r.m.Unlock()
 			if err != nil {
-				r.notify.Signal()
+				r.notify.Notify()
 				return nil, err
 			}
 			return r.formLease(e), nil
@@ -122,7 +122,7 @@ func (r *Pool[V]) Add(el V) error {
 	e := NewElement(el)
 	r.idleQueue.PushBack(e)
 	r.container[e.name] = e
-	r.notify.Signal()
+	r.notify.Notify()
 
 	return nil
 }

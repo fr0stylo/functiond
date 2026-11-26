@@ -72,7 +72,7 @@ func (worker *Shell) Execute(ctx context.Context, payload []byte) (*orchestratio
 	cmd.Dir = worker.dir
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 	cmd.Cancel = func() error {
-		err := syscall.Kill(-cmd.Process.Pid, syscall.SYS_KILL)
+		err := syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL)
 		if errors.Is(err, syscall.ESRCH) {
 			return os.ErrProcessDone
 		}

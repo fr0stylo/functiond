@@ -6,6 +6,7 @@ import (
 	"errors"
 	"functiond/pkg/utils"
 	"sync"
+	"sync/atomic"
 	"time"
 )
 
@@ -24,6 +25,7 @@ type Pool[V Stopable] struct {
 	idleQueue        *list.List
 	container        map[string]*Element[V]
 	maxSize          int
+	creating         atomic.Int32
 	factory          PoolFactory[V]
 	cleanerInterval  time.Duration
 	downscaleTimeout time.Duration
@@ -93,8 +95,11 @@ func (r *Pool[V]) Aquire(ctx context.Context) (*Lease[V], error) {
 		notify := r.notify.Wait()
 		r.m.Unlock()
 
-		if r.factory != nil && len(r.container) < r.maxSize {
+		if r.factory != nil && len(r.container)+int(r.creating.Load()) < r.maxSize {
+			r.creating.Add(1)
 			e, err := NewElementFromFactory(ctx, r.factory)
+			r.creating.Add(-1)
+
 			r.m.Lock()
 			defer r.m.Unlock()
 			if err != nil {

@@ -6,7 +6,6 @@ import (
 	"errors"
 	"functiond/pkg/utils"
 	"sync"
-	"sync/atomic"
 	"time"
 )
 
@@ -25,7 +24,7 @@ type Pool[V Stopable] struct {
 	idleQueue        *list.List
 	container        map[string]*Element[V]
 	maxSize          int
-	creating         atomic.Int32
+	creating         int
 	factory          PoolFactory[V]
 	cleanerInterval  time.Duration
 	downscaleTimeout time.Duration
@@ -93,14 +92,14 @@ func (r *Pool[V]) Aquire(ctx context.Context) (*Lease[V], error) {
 			return r.formLease(e.Value.(*Element[V])), nil
 		}
 		notify := r.notify.Wait()
-		r.m.Unlock()
 
-		if r.factory != nil && len(r.container)+int(r.creating.Load()) < r.maxSize {
-			r.creating.Add(1)
+		if r.factory != nil && len(r.container)+r.creating < r.maxSize {
+			r.creating++
+			r.m.Unlock()
 			e, err := NewElementFromFactory(ctx, r.factory)
-			r.creating.Add(-1)
 
 			r.m.Lock()
+			r.creating--
 			defer r.m.Unlock()
 			if err != nil {
 				r.notify.Notify()
@@ -108,6 +107,7 @@ func (r *Pool[V]) Aquire(ctx context.Context) (*Lease[V], error) {
 			}
 			return r.formLease(e), nil
 		}
+		r.m.Unlock()
 
 		select {
 		case <-ctx.Done():

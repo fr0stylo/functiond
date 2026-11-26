@@ -50,6 +50,9 @@ func (r *Lease[V]) Destroy(ctx context.Context) error {
 }
 
 func (r *Lease[V]) Value() (V, error) {
+	r.pool.m.Lock()
+	defer r.pool.m.Unlock()
+
 	if r.resource == nil {
 		var v V
 		return v, ErrorLeaseExpired
@@ -58,6 +61,9 @@ func (r *Lease[V]) Value() (V, error) {
 }
 
 func (r *Lease[V]) Key() (string, error) {
+	r.pool.m.Lock()
+	defer r.pool.m.Unlock()
+
 	if r.resource == nil {
 		return "", ErrorLeaseExpired
 	}

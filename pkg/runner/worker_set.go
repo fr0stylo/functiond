@@ -150,7 +150,7 @@ func (r *WorkerSet) Execute(ctx context.Context, payload []byte) (chan *ExecResu
 func (r *WorkerSet) retrieveWorker() (worker.Worker, error) {
 	r.lock.Lock()
 	defer r.lock.Unlock()
-	if len(r.downscaleMap) < r.WorkerSetOptions.concurrency && len(r.workers) == 0 {
+	if len(r.downscaleMap) < r.concurrency && len(r.workers) == 0 {
 		if err := r.Start(); err != nil {
 			return nil, err
 		}

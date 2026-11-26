@@ -115,7 +115,7 @@ func (r *Pool[V]) Add(el V) error {
 	defer r.m.Unlock()
 
 	if len(r.container) >= r.maxSize {
-		return errors.New("Max capacity reached")
+		return errors.New("max capacity reached")
 	}
 
 	e := NewElement(el)
